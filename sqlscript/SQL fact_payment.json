@@ -1,0 +1,17 @@
+{
+	"name": "SQL fact_payment",
+	"properties": {
+		"content": {
+			"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseDelimitedTextFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseDelimitedTextFormat] \n\tWITH ( FORMAT_TYPE = DELIMITEDTEXT ,\n\t       FORMAT_OPTIONS (\n\t\t\t FIELD_TERMINATOR = ',',\n\t\t\t USE_TYPE_DEFAULT = TRUE\n\t\t\t))\nGO\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://udacitybikeshareproject@udacitybikeshareproject.dfs.core.windows.net', \n\t\tTYPE = HADOOP \n\t)\nGO\n\nCREATE EXTERNAL TABLE dbo.fact_payment\nWITH (\n    LOCATION     = 'fact_payment',\n    DATA_SOURCE = [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net],\n    FILE_FORMAT = [SynapseDelimitedTextFormat]\n)  \nAS\nSELECT \n    [payment_id], \n    TRY_CONVERT (DATE, LEFT([date], 10)) AS payment_date,\n    [amount],\n    [rider_id]\nFROM [dbo].[staging_payment];\nGO\n\nSELECT TOP 100 * FROM dbo.fact_payment\nGO\n\n-- DROP EXTERNAL TABLE dbo.fact_payment\n-- GO",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "BikeSharPool",
+				"poolName": "BikeSharPool"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
