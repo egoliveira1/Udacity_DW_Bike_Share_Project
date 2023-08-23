@@ -1,0 +1,17 @@
+{
+	"name": "SQL dim_date",
+	"properties": {
+		"content": {
+			"query": "CREATE TABLE dim_date (\n    ts datetime,\n    dayofweek int,\n    dayofmonth int,\n    weekofyear int,\n    quarter int,\n    month int,\n    year int\n)\nDECLARE @StartDate DATETIME\nDECLARE @EndDate DATETIME\nSET @StartDate = (SELECT MIN(TRY_CONVERT(datetime, LEFT(start_at, 19))) FROM staging_trip)\nSET @EndDate = DATEADD(year, 5, (SELECT MAX(TRY_CONVERT(datetime, left(start_at, 19))) FROM staging_trip))\nWHILE @StartDate <= @EndDate\n      BEGIN\n             INSERT INTO [dim_date]\n             SELECT\n                   @StartDate,\n                   DATEPART(WEEKDAY, @StartDate),\n                   DATEPART(DAY, @StartDate),\n                   DATEPART(WEEK, @StartDate),\n                   DATEPART(QUARTER, @StartDate),\n                   DATEPART(MONTH, @StartDate),\n                   DATEPART(YEAR, @StartDate)\n             SET @StartDate = DATEADD(dd, 1, @StartDate)\n      END",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "BikeSharPool",
+				"poolName": "BikeSharPool"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
