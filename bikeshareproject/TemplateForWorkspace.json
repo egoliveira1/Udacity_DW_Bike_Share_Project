@@ -1,0 +1,534 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"type": "string",
+			"metadata": "Workspace name",
+			"defaultValue": "bikeshareproject"
+		},
+		"BikeShareBlob_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'BikeShareBlob'"
+		},
+		"BikeSharePostgres_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'BikeSharePostgres'"
+		},
+		"bikeshareproject-WorkspaceDefaultSqlServer_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'bikeshareproject-WorkspaceDefaultSqlServer'",
+			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:bikeshareproject.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
+		},
+		"bikeshareproject-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://udacitybikeshareproject.dfs.core.windows.net"
+		}
+	},
+	"variables": {
+		"workspaceId": "[concat('Microsoft.Synapse/workspaces/', parameters('workspaceName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('workspaceName'), '/CopyPipeline_5sm')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "ForEach_5sm",
+						"type": "ForEach",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@pipeline().parameters.cw_items",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Copy_5sm",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [
+										{
+											"name": "Source",
+											"value": "public.@{item().source.table}"
+										},
+										{
+											"name": "Destination",
+											"value": "csvs//@{item().destination.fileName}"
+										}
+									],
+									"typeProperties": {
+										"source": {
+											"type": "AzurePostgreSqlSource"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"validateDataConsistency": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "SourceDataset_5sm",
+											"type": "DatasetReference",
+											"parameters": {
+												"cw_table": "@item().source.table"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DestinationDataset_5sm",
+											"type": "DatasetReference",
+											"parameters": {
+												"cw_fileName": "@item().destination.fileName"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"cw_items": {
+						"type": "Array",
+						"defaultValue": [
+							{
+								"source": {
+									"table": "payment"
+								},
+								"destination": {
+									"fileName": "publicpayment.txt"
+								}
+							},
+							{
+								"source": {
+									"table": "rider"
+								},
+								"destination": {
+									"fileName": "publicrider.txt"
+								}
+							},
+							{
+								"source": {
+									"table": "station"
+								},
+								"destination": {
+									"fileName": "publicstation.txt"
+								}
+							},
+							{
+								"source": {
+									"table": "trip"
+								},
+								"destination": {
+									"fileName": "publictrip.txt"
+								}
+							}
+						]
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2023-08-14T22:48:37Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/SourceDataset_5sm')]",
+				"[concat(variables('workspaceId'), '/datasets/DestinationDataset_5sm')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/DestinationDataset_5sm')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "bikeshareproject-WorkspaceDefaultStorage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"cw_fileName": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileSystem": "udacitybikeshareproject"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/bikeshareproject-WorkspaceDefaultStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SourceDataset_5sm')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "BikeSharePostgres",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"cw_table": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "AzurePostgreSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": "public",
+					"table": {
+						"value": "@dataset().cw_table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/BikeSharePostgres')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/BikeShareBlob')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('BikeShareBlob_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/BikeSharePostgres')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzurePostgreSql",
+				"typeProperties": {
+					"connectionString": "[parameters('BikeSharePostgres_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/bikeshareproject-WorkspaceDefaultSqlServer')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"DBName": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDW",
+				"typeProperties": {
+					"connectionString": "[parameters('bikeshareproject-WorkspaceDefaultSqlServer_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/bikeshareproject-WorkspaceDefaultStorage')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('bikeshareproject-WorkspaceDefaultStorage_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/AutoResolveIntegrationRuntime')]",
+			"type": "Microsoft.Synapse/workspaces/integrationRuntimes",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "Managed",
+				"typeProperties": {
+					"computeProperties": {
+						"location": "AutoResolve",
+						"dataFlowProperties": {
+							"computeType": "General",
+							"coreCount": 8,
+							"timeToLive": 0
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/WorkspaceSystemIdentity')]",
+			"type": "Microsoft.Synapse/workspaces/credentials",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"type": "ManagedIdentity",
+				"typeProperties": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQL dim_date')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "CREATE TABLE dim_date (\n    ts datetime,\n    dayofweek int,\n    dayofmonth int,\n    weekofyear int,\n    quarter int,\n    month int,\n    year int\n)\nDECLARE @StartDate DATETIME\nDECLARE @EndDate DATETIME\nSET @StartDate = (SELECT MIN(TRY_CONVERT(datetime, LEFT(start_at, 19))) FROM staging_trip)\nSET @EndDate = DATEADD(year, 5, (SELECT MAX(TRY_CONVERT(datetime, left(start_at, 19))) FROM staging_trip))\nWHILE @StartDate <= @EndDate\n      BEGIN\n             INSERT INTO [dim_date]\n             SELECT\n                   @StartDate,\n                   DATEPART(WEEKDAY, @StartDate),\n                   DATEPART(DAY, @StartDate),\n                   DATEPART(WEEK, @StartDate),\n                   DATEPART(QUARTER, @StartDate),\n                   DATEPART(MONTH, @StartDate),\n                   DATEPART(YEAR, @StartDate)\n             SET @StartDate = DATEADD(dd, 1, @StartDate)\n      END",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "BikeSharPool",
+						"poolName": "BikeSharPool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQL dim_riders')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseDelimitedTextFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseDelimitedTextFormat] \n\tWITH ( FORMAT_TYPE = DELIMITEDTEXT ,\n\t       FORMAT_OPTIONS (\n\t\t\t FIELD_TERMINATOR = ',',\n\t\t\t USE_TYPE_DEFAULT = FALSE\n\t\t\t))\nGO\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://udacitybikeshareproject@udacitybikeshareproject.dfs.core.windows.net', \n\t\tTYPE = HADOOP \n\t)\nGO\n\nCREATE EXTERNAL TABLE dbo.dim_riders\nWITH (\n    LOCATION     = 'dim_riders',\n    DATA_SOURCE = [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net],\n    FILE_FORMAT = [SynapseDelimitedTextFormat]\n)  \nAS\nSELECT \n    [rider_id],\n\t[first] AS first_name,\n\t[last] AS last_name,\n\t[address],\n\tTRY_CONVERT (DATE, LEFT([birthday], 10)) AS birthday,\n\tTRY_CONVERT (DATE, LEFT([account_start_date], 10)) AS account_start_date,\n\tTRY_CONVERT (DATE, LEFT([account_end_date], 10)) AS account_end_date, \n\t[is_member]\nFROM [dbo].[staging_rider];\nGO\n\nSELECT TOP 100 * FROM dbo.dim_riders\nGO\n\n-- DROP EXTERNAL TABLE dbo.dim_riders\n-- GO",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "BikeSharPool",
+						"poolName": "BikeSharPool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQL dim_station')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseDelimitedTextFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseDelimitedTextFormat] \n\tWITH ( FORMAT_TYPE = DELIMITEDTEXT ,\n\t       FORMAT_OPTIONS (\n\t\t\t FIELD_TERMINATOR = ',',\n\t\t\t USE_TYPE_DEFAULT = TRUE\n\t\t\t))\nGO\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://udacitybikeshareproject@udacitybikeshareproject.dfs.core.windows.net', \n\t\tTYPE = HADOOP \n\t)\nGO\n\nCREATE EXTERNAL TABLE dbo.dim_station\nWITH (\n    LOCATION     = 'dim_station',\n    DATA_SOURCE = [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net],\n    FILE_FORMAT = [SynapseDelimitedTextFormat]\n)  \nAS\nSELECT \n    [station_id],\n\t[name],\n\t[latitude],\n\t[longitude]\nFROM [dbo].[staging_station];\nGO\n\nSELECT TOP 100 * FROM dbo.dim_station\nGO\n",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "BikeSharPool",
+						"poolName": "BikeSharPool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQL fact_payment')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseDelimitedTextFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseDelimitedTextFormat] \n\tWITH ( FORMAT_TYPE = DELIMITEDTEXT ,\n\t       FORMAT_OPTIONS (\n\t\t\t FIELD_TERMINATOR = ',',\n\t\t\t USE_TYPE_DEFAULT = TRUE\n\t\t\t))\nGO\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://udacitybikeshareproject@udacitybikeshareproject.dfs.core.windows.net', \n\t\tTYPE = HADOOP \n\t)\nGO\n\nCREATE EXTERNAL TABLE dbo.fact_payment\nWITH (\n    LOCATION     = 'fact_payment',\n    DATA_SOURCE = [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net],\n    FILE_FORMAT = [SynapseDelimitedTextFormat]\n)  \nAS\nSELECT \n    [payment_id], \n    TRY_CONVERT (DATE, LEFT([date], 10)) AS payment_date,\n    [amount],\n    [rider_id]\nFROM [dbo].[staging_payment];\nGO\n\nSELECT TOP 100 * FROM dbo.fact_payment\nGO\n\n-- DROP EXTERNAL TABLE dbo.fact_payment\n-- GO",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "BikeSharPool",
+						"poolName": "BikeSharPool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQL fact_trip')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseDelimitedTextFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseDelimitedTextFormat] \n\tWITH ( FORMAT_TYPE = DELIMITEDTEXT ,\n\t       FORMAT_OPTIONS (\n\t\t\t FIELD_TERMINATOR = ',',\n\t\t\t USE_TYPE_DEFAULT = FALSE\n\t\t\t))\nGO\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://udacitybikeshareproject@udacitybikeshareproject.dfs.core.windows.net', \n\t\tTYPE = HADOOP \n\t)\nGO\n\nCREATE EXTERNAL TABLE dbo.fact_trip\nWITH (\n    LOCATION     = 'fact_trip',\n    DATA_SOURCE = [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net],\n    FILE_FORMAT = [SynapseDelimitedTextFormat]\n)  \nAS\nSELECT \n    [trip_id],\n\t[rideable_type],\n\tTRY_CONVERT (DATE, LEFT(st.[start_at], 10)) AS started_at,\n\tTRY_CONVERT (DATE, LEFT(st.[ended_at], 10)) AS ended_at,\n\t[start_station_id],\n\t[end_station_id],\n\tst.[rider_id],\n\tTRY_CONVERT (DATE, LEFT([birthday], 10)) AS birthday,\n\tDATEDIFF (YEAR, birthday, (TRY_CONVERT (DATE, LEFT(st.[start_at], 10)))) AS age,\n\tDATEDIFF (MINUTE, (TRY_CONVERT (DATE, LEFT(st.[start_at], 10))), (TRY_CONVERT (DATE, LEFT(st.[ended_at], 10)))) AS trip_duration\nFROM [dbo].[staging_trip] st\nJOIN [dbo].[staging_rider] sr ON st.[rider_id] = sr.[rider_id];\nGO\n\nSELECT TOP 100 * FROM dbo.fact_trip\nGO\n\n-- DROP EXTERNAL TABLE dbo.fact_trip\n-- GO",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "BikeSharPool",
+						"poolName": "BikeSharPool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQL staging_payment')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseDelimitedTextFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseDelimitedTextFormat] \n\tWITH ( FORMAT_TYPE = DELIMITEDTEXT ,\n\t       FORMAT_OPTIONS (\n\t\t\t FIELD_TERMINATOR = ',',\n\t\t\t FIRST_ROW = 11,\n\t\t\t USE_TYPE_DEFAULT = TRUE\n\t\t\t))\nGO\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://udacitybikeshareproject@udacitybikeshareproject.dfs.core.windows.net', \n\t\tTYPE = HADOOP \n\t)\nGO\n\nCREATE EXTERNAL TABLE dbo.staging_payment (\n\t[payment_id] bigint,\n\t[date] NVARCHAR(4000),\n\t[amount] float,\n\t[rider_id] bigint\n\t)\n\tWITH (\n\tLOCATION = 'payment.txt',\n\tDATA_SOURCE = [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net],\n\tFILE_FORMAT = [SynapseDelimitedTextFormat]\n\t)\nGO\n\nSELECT TOP 100 * FROM dbo.staging_payment\nGO",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "BikeSharPool",
+						"poolName": "BikeSharPool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQL staging_rider')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseDelimitedTextFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseDelimitedTextFormat] \n\tWITH ( FORMAT_TYPE = DELIMITEDTEXT ,\n\t       FORMAT_OPTIONS (\n\t\t\t FIELD_TERMINATOR = ',',\n\t\t\t FIRST_ROW = 11,\n\t\t\t USE_TYPE_DEFAULT = FALSE\n\t\t\t))\nGO\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://udacitybikeshareproject@udacitybikeshareproject.dfs.core.windows.net', \n\t\tTYPE = HADOOP \n\t)\nGO\n\nCREATE EXTERNAL TABLE dbo.staging_rider (\n\t[rider_id] bigint,\n\t[first] nvarchar(4000),\n\t[last] nvarchar(4000),\n\t[address] nvarchar(4000),\n\t[birthday] nvarchar(4000),\n\t[account_start_date] nvarchar(4000),\n\t[account_end_date] nvarchar(4000),\n\t[is_member] bit\n\t)\n\tWITH (\n\tLOCATION = 'rider.txt',\n\tDATA_SOURCE = [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net],\n\tFILE_FORMAT = [SynapseDelimitedTextFormat]\n\t)\nGO\n\n\nSELECT TOP 100 * FROM dbo.staging_rider\nGO",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "BikeSharPool",
+						"poolName": "BikeSharPool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQL staging_station')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseDelimitedTextFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseDelimitedTextFormat] \n\tWITH ( FORMAT_TYPE = DELIMITEDTEXT ,\n\t       FORMAT_OPTIONS (\n\t\t\t FIELD_TERMINATOR = ',',\n\t\t\t FIRST_ROW = 11,\n\t\t\t USE_TYPE_DEFAULT = TRUE\n\t\t\t))\nGO\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://udacitybikeshareproject@udacitybikeshareproject.dfs.core.windows.net', \n\t\tTYPE = HADOOP \n\t)\nGO\n\nCREATE EXTERNAL TABLE dbo.staging_station (\n\t[station_id] nvarchar(4000),\n\t[name] nvarchar(4000),\n\t[latitude] float,\n\t[longitude] float\n\t)\n\tWITH (\n\tLOCATION = 'station.txt',\n\tDATA_SOURCE = [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net],\n\tFILE_FORMAT = [SynapseDelimitedTextFormat]\n\t)\nGO\n\n\nSELECT TOP 100 * FROM dbo.staging_station\nGO",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "BikeSharPool",
+						"poolName": "BikeSharPool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQL staging_trip')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'SynapseDelimitedTextFormat') \n\tCREATE EXTERNAL FILE FORMAT [SynapseDelimitedTextFormat] \n\tWITH ( FORMAT_TYPE = DELIMITEDTEXT ,\n\t       FORMAT_OPTIONS (\n\t\t\t FIELD_TERMINATOR = ',',\n\t\t\t FIRST_ROW = 11,\n\t\t\t USE_TYPE_DEFAULT = FALSE\n\t\t\t))\nGO\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net') \n\tCREATE EXTERNAL DATA SOURCE [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net] \n\tWITH (\n\t\tLOCATION = 'abfss://udacitybikeshareproject@udacitybikeshareproject.dfs.core.windows.net', \n\t\tTYPE = HADOOP \n\t)\nGO\n\nCREATE EXTERNAL TABLE dbo.staging_trip (\n\t[trip_id] nvarchar(4000),\n\t[rideable_type] nvarchar(4000),\n\t[start_at] nvarchar(4000),\n\t[ended_at] nvarchar(4000),\n\t[start_station_id] nvarchar(4000),\n\t[end_station_id] nvarchar(4000) ,\n\t[rider_id] bigint\n\t)\n\tWITH (\n\tLOCATION = 'trip.txt',\n\tDATA_SOURCE = [udacitybikeshareproject_udacitybikeshareproject_dfs_core_windows_net],\n\tFILE_FORMAT = [SynapseDelimitedTextFormat]\n\t)\nGO\n\n\nSELECT TOP 100 * FROM dbo.staging_trip\nGO\n\n-- DROP EXTERNAL TABLE dbo.staging_trip\n-- GO",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "BikeSharPool",
+						"poolName": "BikeSharPool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/BikeSharPool')]",
+			"type": "Microsoft.Synapse/workspaces/sqlPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"collation": "SQL_Latin1_General_CP1_CI_AS",
+				"maxSizeBytes": 263882790666240,
+				"annotations": []
+			},
+			"dependsOn": [],
+			"location": "westeurope"
+		}
+	]
+}
